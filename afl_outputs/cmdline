@@ -1,0 +1,6 @@
+python3
+./test.py
+modules/RstUefiDriverSupport
+nvram
+SaSetup
+@@
