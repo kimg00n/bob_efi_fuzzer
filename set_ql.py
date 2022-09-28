@@ -64,6 +64,7 @@ def main(args):
     pe = pefile.PE(target, fast_load=True)
     entry_point = image_base + pe.OPTIONAL_HEADER.AddressOfEntryPoint
 
+    print(pe)
     ql.log.info("===============================================")
     ql.log.info("Loaded image's BaseAddr: "+str(hex(image_base)))
     ql.log.info("AddressOfEntryPoint    : "+str(hex(pe.OPTIONAL_HEADER.AddressOfEntryPoint)))
