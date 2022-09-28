@@ -1,3 +1,0 @@
-# environment variables:
-# command line:
-'afl-fuzz' '-m' 'none' '-i' 'afl_inputs/SaSetup/' '-o' 'afl_outputs/' '-U' '--' 'python3' './test.py' 'modules/RstUefiDriverSupport' 'nvram' 'SaSetup' '@@'
