@@ -37,7 +37,8 @@ def run(args):
         args.extra_modules = []
 
     ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEBUG)
-    enable_sanitized_heap(ql)
+    if args.sanitize == "y":
+        enable_sanitized_heap(ql)
     ql.run()
     if not ql.os.heap.validate():
         my_abort("Canary corruption detected")
@@ -73,7 +74,8 @@ if __name__ == "__main__":
     parser.add_argument("target")
     parser.add_argument("-x", "--extra-modules", help="Extra modules to load", nargs='+')
     parser.add_argument("-v", "--nvram-file", help="Pickled dictionary containing the NVRAM environment variables")
-    parser.add_argument("-o", "--verbose", help="Trace execution for debugging purposes", choices=["QL_VERBOSE.DEFAULT", "QL_VERBOSE.DEBUG", "QL_VERBOSE.DISASM", "QL_VERBOSE.OFF", "QL_VERBOSE.DUMP"])
+    parser.add_argument("-o", "--verbose", help="Trace execution for debugging purposes", choices=["QL_VERBOSE.DEFAULT", "QL_VERBOSE.DEBUG", "QL_VERBOSE.DISASM", "QL_VERBOSE.OFF", "QL_VERBOSE.DUMP"], default="QL_VERBOSE.DEFAULT")
+    parser.add_argument("-s", "--sanitize", help="Enable heap sanitizer", choices=["y", "n"], defualt="y")
 
     subparsers = parser.add_subparsers(help="Fuzzing modes", dest="mode")
     nvram_subparsers = subparsers.add_parser("nvram")
