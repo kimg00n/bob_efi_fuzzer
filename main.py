@@ -6,6 +6,7 @@ from qiling import *
 from qiling.os.uefi.const import *
 from qiling.const import QL_VERBOSE
 from qiling.extensions.sanitizers.heap import QlSanitizedMemoryHeap
+from qiling.extensions import trace
 
 def my_abort(msg):
     print(f"\n*** {msg} ***\n")
@@ -26,7 +27,6 @@ def enable_sanitized_heap(ql, fault_rate=0):
     ql.loader.dxe_context.heap = heap
 
 def run(args):
-    print(args)
     if args.nvram_file == None:
         env = []
     else:
@@ -37,6 +37,7 @@ def run(args):
         args.extra_modules = []
 
     ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEBUG)
+    trace.enable_full_trace(ql)
     if args.sanitize == "y":
         enable_sanitized_heap(ql)
     ql.run()
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("-x", "--extra-modules", help="Extra modules to load", nargs='+')
     parser.add_argument("-v", "--nvram-file", help="Pickled dictionary containing the NVRAM environment variables")
     parser.add_argument("-o", "--verbose", help="Trace execution for debugging purposes", choices=["QL_VERBOSE.DEFAULT", "QL_VERBOSE.DEBUG", "QL_VERBOSE.DISASM", "QL_VERBOSE.OFF", "QL_VERBOSE.DUMP"], default="QL_VERBOSE.DEFAULT")
-    parser.add_argument("-s", "--sanitize", help="Enable heap sanitizer", choices=["y", "n"], defualt="y")
+    parser.add_argument("-s", "--sanitize", help="Enable heap sanitizer", choices=["y", "n"], default="y")
 
     subparsers = parser.add_subparsers(help="Fuzzing modes", dest="mode")
     nvram_subparsers = subparsers.add_parser("nvram")
