@@ -5,6 +5,25 @@ import pickle
 from qiling import *
 from qiling.os.uefi.const import *
 from qiling.const import QL_VERBOSE
+from qiling.extensions.sanitizers.heap import QlSanitizedMemoryHeap
+
+def my_abort(msg):
+    print(f"\n*** {msg} ***\n")
+    os.abort()
+
+def enable_sanitized_heap(ql, fault_rate=0):
+    heap = QlSanitizedMemoryHeap(ql, ql.os.heap, fault_rate=fault_rate)
+
+    heap.oob_handler      = lambda *args: my_abort(f'Out-of-bounds read detected')
+    heap.bo_handler       = lambda *args: my_abort(f'Buffer overflow/underflow detected')
+    heap.bad_free_handler = lambda *args: my_abort(f'Double free or bad free detected')
+    heap.uaf_handler      = lambda *args: my_abort(f'Use-after-free detected')
+
+    # make sure future allocated buffers are not too close to UEFI data
+    heap.alloc(0x1000)
+
+    ql.os.heap = heap
+    ql.loader.dxe_context.heap = heap
 
 def run(args):
     print(args)
@@ -17,8 +36,11 @@ def run(args):
     if args.extra_modules == None:
         args.extra_modules = []
 
-    ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEFAULT)
+    ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEBUG)
+    enable_sanitized_heap(ql)
     ql.run()
+    if not ql.os.heap.validate():
+        my_abort("Canary corruption detected")
 
 
 def main(args):
