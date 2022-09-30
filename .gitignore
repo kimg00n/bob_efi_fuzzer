@@ -1,0 +1,5 @@
+*.efi
+*.bin
+afl_inputs
+afl_outputs
+nvram.pickle
