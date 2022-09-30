@@ -42,9 +42,29 @@ def run(args):
     if not ql.os.heap.validate():
         my_abort("Canary corruption detected")
 
+def fuzz(args):
+    print(args)
+    if args.nvram_file == None:
+        env = []
+    else:
+        with open(args.nvram_file, "rb") as nv:
+            env = pickle.load(nv)
+
+    if args.extra_modules == None:
+        args.extra_modules = []
+
+    ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEBUG)
+    enable_sanitized_heap(ql)
+    ql.run()
+    if not ql.os.heap.validate():
+        my_abort("Canary corruption detected")
+
 
 def main(args):
-    run(args)
+    if args.command == 'run':
+        run(args)
+    elif args.command == 'fuzz':
+        fuzz(args)
     os._exit(0)
 
 if __name__ == "__main__":
