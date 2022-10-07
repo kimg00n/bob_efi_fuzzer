@@ -7,6 +7,7 @@ from qiling.os.uefi.const import *
 from qiling.const import QL_VERBOSE
 from qiling.extensions.sanitizers.heap import QlSanitizedMemoryHeap
 from qiling.extensions import trace
+from qiling.debugger.qdb import QlQdb
 
 def my_abort(msg):
     print(f"\n*** {msg} ***\n")
@@ -40,6 +41,8 @@ def run(args):
     trace.enable_full_trace(ql)
     if args.sanitize == "y":
         enable_sanitized_heap(ql)
+    if args.gdb != None:
+        ql.debugger=True
     ql.run()
     if not ql.os.heap.validate():
         my_abort("Canary corruption detected")
@@ -57,6 +60,8 @@ def fuzz(args):
 
     ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEBUG)
     enable_sanitized_heap(ql)
+    if args.gdb != None:
+        ql.debugger=True
     ql.run()
     if not ql.os.heap.validate():
         my_abort("Canary corruption detected")
@@ -77,6 +82,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--nvram-file", help="Pickled dictionary containing the NVRAM environment variables")
     parser.add_argument("-o", "--verbose", help="Trace execution for debugging purposes", choices=["QL_VERBOSE.DEFAULT", "QL_VERBOSE.DEBUG", "QL_VERBOSE.DISASM", "QL_VERBOSE.OFF", "QL_VERBOSE.DUMP"], default="QL_VERBOSE.DEFAULT")
     parser.add_argument("-s", "--sanitize", help="Enable heap sanitizer", choices=["y", "n"], default="y")
+    parser.add_argument("-g", "--gdb", help="Enable gdb server", action="store_true")
 
     subparsers = parser.add_subparsers(help="Fuzzing modes", dest="mode")
     nvram_subparsers = subparsers.add_parser("nvram")

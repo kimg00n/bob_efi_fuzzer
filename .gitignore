@@ -3,3 +3,4 @@
 afl_inputs
 afl_outputs
 nvram.pickle
+.gdb_history
