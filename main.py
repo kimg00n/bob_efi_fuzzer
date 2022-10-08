@@ -2,6 +2,7 @@ import argparse
 import os
 import pefile
 import pickle
+from unicorn import *
 from qiling import *
 from qiling.os.uefi.const import *
 from qiling.const import QL_VERBOSE
@@ -41,15 +42,19 @@ def start_afl(ql: Qiling, user_data):
         if not ql.os.heap.validate():
             print(err)
             my_abort("Canary corruption detected")
+        crash = (ql.internal_exception is not None) or (err != UC_ERR_OK)
+        return crash
     
     place_input_callback = place_input_callback_nvram
-    if not afl.ql_afl_fuzz(ql,
+
+    afl.ql_afl_fuzz(ql,
         input_file=infile, 
         place_input_callback=place_input_callback, 
         exits=[ql.os.exit_point], 
         always_validate=True, 
-        validate_crash_callback=validate_crash):
-        os._exit(0)  # that's a looot faster than tidying up.
+        validate_crash_callback=validate_crash)
+    print("Dry run completed successfully without AFL attached.")
+    os._exit(0)  # that's a looot faster than tidying up.
 
 def run(args):
     if args.nvram_file == None:
