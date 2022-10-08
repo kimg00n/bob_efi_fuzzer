@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 import pefile
 import pickle
 from qiling import *
@@ -8,7 +7,6 @@ from qiling.os.uefi.const import *
 from qiling.const import QL_VERBOSE
 from qiling.extensions.sanitizers.heap import QlSanitizedMemoryHeap
 from qiling.extensions import trace
-from qiling.debugger.qdb import QlQdb
 from qiling.extensions import afl
 
 def my_abort(msg):
