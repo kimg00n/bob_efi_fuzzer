@@ -28,6 +28,60 @@ def enable_sanitized_heap(ql, fault_rate=0):
     ql.os.heap = heap
     ql.loader.dxe_context.heap = heap
 
+def enable_sanitized_CopyMem(ql):
+        """
+        Replaces the emulated CopyMem() service with an inline assembly implementation.
+        This implementation will trigger hooks placed on the Destination and Source buffers.
+        """
+
+        # typedef VOID(EFIAPI * EFI_COPY_MEM) (IN VOID *Destination, IN VOID *Source, IN UINTN Length)
+        CODE = """
+            push rsi
+            push rdi
+            mov rsi, rdx
+            mov rdi, rcx
+            mov rcx, r8            
+            rep movsb
+            pop rdi
+            pop rsi
+            """
+            
+        runcode, _ = ql.assembler.asm(CODE)
+        ptr = ql.os.heap.alloc(len(runcode))
+        ql.mem.write(ptr, bytes(runcode))
+
+        def my_CopyMem(ql, address, params):
+            ql.os.exec_arbitrary(ptr, ptr+len(runcode))
+            return 0
+
+        ql.set_api("CopyMem", my_CopyMem)
+
+def enable_sanitized_SetMem(ql):
+        """
+        Replaces the emulated SetMem() service with an inline assembly implementation.
+        This implementation will trigger hooks placed on the Buffer argument.
+        """
+
+        # typedef VOID(EFIAPI * EFI_SET_MEM) (IN VOID *Buffer, IN UINTN Size, IN UINT8 Value)
+        CODE = """
+            push rdi
+            mov rdi, rcx
+            mov rcx, rdx
+            mov al, r8b            
+            rep stosb
+            pop rdi
+            """
+            
+        runcode, _ = ql.assembler.asm(CODE)
+        ptr = ql.os.heap.alloc(len(runcode))
+        ql.mem.write(ptr, bytes(runcode))
+
+        def my_SetMem(ql, address, params):
+            ql.os.exec_arbitrary(ptr, ptr+len(runcode))
+            return 0
+
+        ql.set_api("SetMem", my_SetMem)
+
 def start_afl(ql: Qiling, user_data):
     """Have Unicorn fork and start instrumentation.
     """
@@ -70,6 +124,8 @@ def run(args):
     trace.enable_full_trace(ql)
     if args.sanitize == "y":
         enable_sanitized_heap(ql)
+        enable_sanitized_CopyMem(ql)
+        enable_sanitized_SetMem(ql)
     if args.gdb == "y":
         ql.debugger=True
     ql.run()
