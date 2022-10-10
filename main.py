@@ -46,7 +46,7 @@ def enable_sanitized_CopyMem(ql):
             pop rsi
             """
             
-        runcode, _ = ql.assembler.asm(CODE)
+        runcode, _ = ql.arch.assembler.asm(CODE)
         ptr = ql.os.heap.alloc(len(runcode))
         ql.mem.write(ptr, bytes(runcode))
 
@@ -54,7 +54,7 @@ def enable_sanitized_CopyMem(ql):
             ql.os.exec_arbitrary(ptr, ptr+len(runcode))
             return 0
 
-        ql.set_api("CopyMem", my_CopyMem)
+        ql.os.set_api("CopyMem", my_CopyMem)
 
 def enable_sanitized_SetMem(ql):
         """
@@ -72,7 +72,7 @@ def enable_sanitized_SetMem(ql):
             pop rdi
             """
             
-        runcode, _ = ql.assembler.asm(CODE)
+        runcode, _ = ql.arch.assembler.asm(CODE)
         ptr = ql.os.heap.alloc(len(runcode))
         ql.mem.write(ptr, bytes(runcode))
 
@@ -80,7 +80,7 @@ def enable_sanitized_SetMem(ql):
             ql.os.exec_arbitrary(ptr, ptr+len(runcode))
             return 0
 
-        ql.set_api("SetMem", my_SetMem)
+        ql.os.set_api("SetMem", my_SetMem)
 
 def start_afl(ql: Qiling, user_data):
     """Have Unicorn fork and start instrumentation.
@@ -143,8 +143,13 @@ def fuzz(args):
         args.extra_modules = []
 
     ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.OFF)
-    enable_sanitized_heap(ql)
+    
+    print(dir(ql))
 
+    enable_sanitized_heap(ql)
+    enable_sanitized_CopyMem(ql)
+    enable_sanitized_SetMem(ql)
+    
     target = ql.loader.images[-1].path
     pe = pefile.PE(target, fast_load=True)
     image_base = ql.loader.images[-1].base
