@@ -3,6 +3,8 @@ import os
 import pefile
 import pickle
 from unicorn import *
+from unicornafl import *
+from unicorn import UcError
 from qiling import *
 from qiling.os.uefi.const import *
 from qiling.const import QL_VERBOSE
@@ -10,8 +12,9 @@ from qiling.extensions.sanitizers.heap import QlSanitizedMemoryHeap
 from qiling.extensions import trace
 from qiling.extensions import afl
 
-def my_abort(msg):
+def my_abort(msg, ql):
     print(f"\n*** {msg} ***\n")
+    ql.os.emu_error()
     os.abort()
 
 def enable_sanitized_heap(ql, fault_rate=0):
@@ -93,22 +96,27 @@ def start_afl(ql: Qiling, user_data):
         ql.env[varname] = input
 
     def validate_crash(err):
-        if not ql.os.heap.validate():
-            print(err)
-            my_abort("Canary corruption detected")
+        if hasattr(ql.os.heap, "validate"):
+            if not ql.os.heap.validate():
+                my_abort("Canary corruption detected", ql)
+        
         crash = (ql.internal_exception is not None) or (err != UC_ERR_OK)
         return crash
     
     place_input_callback = place_input_callback_nvram
+    try:
+        afl.ql_afl_fuzz(ql,
+            input_file=infile, 
+            place_input_callback=place_input_callback, 
+            exits=[ql.os.exit_point], 
+            always_validate=True, 
+            validate_crash_callback=validate_crash)
+        print("Dry run completed successfully without AFL attached.")
+        os._exit(0)  # that's a looot faster than tidying up.
 
-    afl.ql_afl_fuzz(ql,
-        input_file=infile, 
-        place_input_callback=place_input_callback, 
-        exits=[ql.os.exit_point], 
-        always_validate=True, 
-        validate_crash_callback=validate_crash)
-    print("Dry run completed successfully without AFL attached.")
-    os._exit(0)  # that's a looot faster than tidying up.
+    except unicornafl.UcAflError as ex:
+        if ex != unicornafl.UC_AFL_RET_CALLED_TWICE:
+            raise
 
 def run(args):
     if args.nvram_file == None:
@@ -130,7 +138,7 @@ def run(args):
         ql.debugger=True
     ql.run()
     if not ql.os.heap.validate():
-        my_abort("Canary corruption detected")
+        my_abort("Canary corruption detected", ql)
 
 def fuzz(args):
     if args.nvram_file == None:
@@ -143,8 +151,6 @@ def fuzz(args):
         args.extra_modules = []
 
     ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.OFF)
-    
-    print(dir(ql))
 
     enable_sanitized_heap(ql)
     enable_sanitized_CopyMem(ql)
