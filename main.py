@@ -1,170 +1,40 @@
 import argparse
 import os
-import pefile
-import pickle
+import functools
 from unicorn import *
-from unicornafl import *
-from unicorn import UcError
-from qiling import *
-from qiling.os.uefi.const import *
-from qiling.const import QL_VERBOSE
-from qiling.extensions.sanitizers.heap import QlSanitizedMemoryHeap
-from qiling.extensions import trace
-from qiling.extensions import afl
+from core.EmulationManager import EmulationManager
+from core.FuzzingManager import FuzzingManager
+import sanitizers
 
-def my_abort(msg, ql):
-    print(f"\n*** {msg} ***\n")
-    ql.os.emu_error()
-    os.abort()
+auto_int = functools.partial(int, base=0)
 
-def enable_sanitized_heap(ql, fault_rate=0):
-    heap = QlSanitizedMemoryHeap(ql, ql.os.heap, fault_rate=fault_rate)
-
-    heap.oob_handler      = lambda *args: my_abort(f'Out-of-bounds read detected')
-    heap.bo_handler       = lambda *args: my_abort(f'Buffer overflow/underflow detected')
-    heap.bad_free_handler = lambda *args: my_abort(f'Double free or bad free detected')
-    heap.uaf_handler      = lambda *args: my_abort(f'Use-after-free detected')
-
-    # make sure future allocated buffers are not too close to UEFI data
-    heap.alloc(0x1000)
-
-    ql.os.heap = heap
-    ql.loader.dxe_context.heap = heap
-
-def enable_sanitized_CopyMem(ql):
-        """
-        Replaces the emulated CopyMem() service with an inline assembly implementation.
-        This implementation will trigger hooks placed on the Destination and Source buffers.
-        """
-
-        # typedef VOID(EFIAPI * EFI_COPY_MEM) (IN VOID *Destination, IN VOID *Source, IN UINTN Length)
-        CODE = """
-            push rsi
-            push rdi
-            mov rsi, rdx
-            mov rdi, rcx
-            mov rcx, r8            
-            rep movsb
-            pop rdi
-            pop rsi
-            """
-            
-        runcode, _ = ql.arch.assembler.asm(CODE)
-        ptr = ql.os.heap.alloc(len(runcode))
-        ql.mem.write(ptr, bytes(runcode))
-
-        def my_CopyMem(ql, address, params):
-            ql.os.exec_arbitrary(ptr, ptr+len(runcode))
-            return 0
-
-        ql.os.set_api("CopyMem", my_CopyMem)
-
-def enable_sanitized_SetMem(ql):
-        """
-        Replaces the emulated SetMem() service with an inline assembly implementation.
-        This implementation will trigger hooks placed on the Buffer argument.
-        """
-
-        # typedef VOID(EFIAPI * EFI_SET_MEM) (IN VOID *Buffer, IN UINTN Size, IN UINT8 Value)
-        CODE = """
-            push rdi
-            mov rdi, rcx
-            mov rcx, rdx
-            mov al, r8b            
-            rep stosb
-            pop rdi
-            """
-            
-        runcode, _ = ql.arch.assembler.asm(CODE)
-        ptr = ql.os.heap.alloc(len(runcode))
-        ql.mem.write(ptr, bytes(runcode))
-
-        def my_SetMem(ql, address, params):
-            ql.os.exec_arbitrary(ptr, ptr+len(runcode))
-            return 0
-
-        ql.os.set_api("SetMem", my_SetMem)
-
-def start_afl(ql: Qiling, user_data):
-    """Have Unicorn fork and start instrumentation.
-    """
-    (varname, infile) = user_data
-    def place_input_callback_nvram(ql: Qiling, input: bytes, _):
-        """
-        Injects the mutated variable to the emulated NVRAM environment.
-        """
-        ql.env[varname] = input
-
-    def validate_crash(err):
-        if hasattr(ql.os.heap, "validate"):
-            if not ql.os.heap.validate():
-                my_abort("Canary corruption detected", ql)
-        
-        crash = (ql.internal_exception is not None) or (err != UC_ERR_OK)
-        return crash
+def create_emulator(cls, args):
+    emu = cls(args.target, args.extra_modules)
     
-    place_input_callback = place_input_callback_nvram
-    try:
-        afl.ql_afl_fuzz(ql,
-            input_file=infile, 
-            place_input_callback=place_input_callback, 
-            exits=[ql.os.exit_point], 
-            always_validate=True, 
-            validate_crash_callback=validate_crash)
-        print("Dry run completed successfully without AFL attached.")
-        os._exit(0)  # that's a looot faster than tidying up.
+    # Load NVRAM environment from the provided Pickle.
+    if args.nvram_file:
+        emu.load_nvram(args.nvram_file)
 
-    except unicornafl.UcAflError as ex:
-        if ex != unicornafl.UC_AFL_RET_CALLED_TWICE:
-            raise
+    # Set the fault handling policy.
+    if args.fault_handler:
+        emu.fault_handler = args.fault_handler
+
+    # Initialize SMRAM and some SMM-related protocols.
+    #emu.enable_smm()
+
+    # Enable sanitizers.
+    if args.sanitize:
+        emu.sanitizers = args.sanitize
+
+    return emu
 
 def run(args):
-    if args.nvram_file == None:
-        env = []
-    else:
-        with open(args.nvram_file, "rb") as nv:
-            env = pickle.load(nv)
-
-    if args.extra_modules == None:
-        args.extra_modules = []
-
-    ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.DEBUG)
-    trace.enable_full_trace(ql)
-    if args.sanitize == "y":
-        enable_sanitized_heap(ql)
-        enable_sanitized_CopyMem(ql)
-        enable_sanitized_SetMem(ql)
-    if args.gdb == "y":
-        ql.debugger=True
-    ql.run()
-    if not ql.os.heap.validate():
-        my_abort("Canary corruption detected", ql)
+    emu = create_emulator(EmulationManager, args)
+    emu.run(args.end, args.timeout)
 
 def fuzz(args):
-    if args.nvram_file == None:
-        env = []
-    else:
-        with open(args.nvram_file, "rb") as nv:
-            env = pickle.load(nv)
-
-    if args.extra_modules == None:
-        args.extra_modules = []
-
-    ql = Qiling(args.extra_modules + [args.target], ".", env = env, verbose=QL_VERBOSE.OFF)
-
-    enable_sanitized_heap(ql)
-    enable_sanitized_CopyMem(ql)
-    enable_sanitized_SetMem(ql)
-    
-    target = ql.loader.images[-1].path
-    pe = pefile.PE(target, fast_load=True)
-    image_base = ql.loader.images[-1].base
-    entry_point = image_base + pe.OPTIONAL_HEADER.AddressOfEntryPoint
-
-    # We want AFL's forkserver to spawn new copies starting from the main module's entrypoint.
-    ql.hook_address(callback=start_afl, address=entry_point, user_data=(args.varname, args.input))
-    ql.run()
-
+    emu = create_emulator(FuzzingManager, args)
+    emu.fuzz(args.end, args.timeout, varname=args.varname, infile=args.infile)
 
 def main(args):
     if args.command == 'run':
@@ -180,11 +50,14 @@ if __name__ == "__main__":
     parser.add_argument("-x", "--extra-modules", help="Extra modules to load", nargs='+')
     parser.add_argument("-v", "--nvram-file", help="Pickled dictionary containing the NVRAM environment variables")
     parser.add_argument("-o", "--verbose", help="Trace execution for debugging purposes", choices=["QL_VERBOSE.DEFAULT", "QL_VERBOSE.DEBUG", "QL_VERBOSE.DISASM", "QL_VERBOSE.OFF", "QL_VERBOSE.DUMP"], default="QL_VERBOSE.DEFAULT")
-    parser.add_argument("-s", "--sanitize", help="Enable heap sanitizer", choices=["y", "n"], default="y")
+    parser.add_argument("-s", "--sanitize", help="Enable memory sanitizer", choices=sanitizers.get_available_sanitizers().keys(), nargs='+')
     parser.add_argument("-g", "--gdb", help="Enable gdb server at run mode", default="n")
+    parser.add_argument("-e", "--end", help="End address for emulation", type=auto_int)
+    parser.add_argument("-t", "--timeout", help="Emulation timeout in ms", type=int, default=60*100000)
+    parser.add_argument("-f", "--fault-handler", help="What to do when encountering a fault?", choices=['crash', 'stop', 'ignore', 'break'])
 
     subparsers = parser.add_subparsers(help="Fuzzing modes", dest="mode")
     nvram_subparsers = subparsers.add_parser("nvram")
     nvram_subparsers.add_argument("varname", help="Mutation할 NVRAM 변수명")
-    nvram_subparsers.add_argument("input", help="Mutation된 input file == @@")
+    nvram_subparsers.add_argument("infile", help="Mutation된 input file == @@")
     main(parser.parse_args())
