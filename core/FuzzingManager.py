@@ -1,6 +1,6 @@
 from core.EmulationManager import EmulationManager
 from unicorn import *
-import unicornafl
+from unicornafl import *
 import pefile
 from qiling import Qiling
 import os
@@ -13,30 +13,31 @@ def verbose_abort(ql):
 def start_afl(_ql: Qiling, user_data):
     (varname, infile) = user_data
 
-    def place_input_callback(ql: Qiling, input: bytes, _):
-        ql.env[varname] = input
+    def place_input_callback(uc, _input, _, data):
+        _ql.env[varname] = input
     
-    def validate_crash(err):
+    def validate_crash(uc, result, _input_bs, persistent_round, data):
         if hasattr(_ql.os.heap, "validate"):
             if not _ql.os.heap.validate():
                 verbose_abort(_ql)
                 return True
+        elif result == UC_AFL_RET_NO_AFL:
+            return False
         
-        crash = (_ql.internal_exception is not None) or (err.errno != UC_ERR_OK)
+        crash = result != UC_ERR_OK
         return crash
-    
-    try:
-        if not afl.ql_afl_fuzz(_ql,
-                                input_file=infile,
-                                place_input_callback=place_input_callback,
-                                exits=[_ql.os.exit_point],
-                                always_validate=True,
-                                validate_crash_callback=validate_crash):
 
+    try:
+        if not uc_afl_fuzz(_ql.uc,
+                            input_file=infile,
+                            place_input_callback=place_input_callback,
+                            exits=[_ql.os.exit_point],
+                            always_validate=True,
+                            validate_crash_callback=validate_crash):
                                 print("Dry run completed successfully without AFL attached.")
                                 os._exit(0)  # that's a looot faster than tidying up.
     except unicornafl.UcAflError as ex:
-        if ex != unicornafl.UC_AFL_RET_CALLED_TWICE:
+        if ex.errno != unicornafl.UC_AFL_RET_CALLED_TWICE:
             raise
 
 class FuzzingManager(EmulationManager):

@@ -16,6 +16,8 @@ class EmulationManager:
         
         self.ql = Qiling(extra_modules + [target_module], '.', verbose=QL_VERBOSE.DEFAULT)
 
+        callbacks.init_callbacks(self.ql)
+
         self.sanitizers = EmulationManager.DEFAULT_SANITIZERS
         self.fault_handler = 'exit'
 
