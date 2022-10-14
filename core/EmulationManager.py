@@ -16,8 +16,6 @@ class EmulationManager:
         
         self.ql = Qiling(extra_modules + [target_module], '.', verbose=QL_VERBOSE.DEFAULT)
 
-        callbacks.init_callbacks(self.ql)
-
         self.sanitizers = EmulationManager.DEFAULT_SANITIZERS
         self.fault_handler = 'exit'
 
@@ -48,9 +46,6 @@ class EmulationManager:
             self.ql.os.fault_handler = fault._break
     
     def run(self, end=None, timeout=0, **kwargs):
-
-        if end:
-            end = callbacks.set_end_of_execution_callback(self.ql, end)
         
         self._enable_sanitizers()
 
