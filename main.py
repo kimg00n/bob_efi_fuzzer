@@ -47,7 +47,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("command", help="프로그램 실행 모드 선택", choices=["run", "fuzz"])
     parser.add_argument("target")
-    parser.add_argument("-x", "--extra-modules", help="Extra modules to load", nargs='+')
     parser.add_argument("-v", "--nvram-file", help="Pickled dictionary containing the NVRAM environment variables")
     parser.add_argument("-o", "--verbose", help="Trace execution for debugging purposes", choices=["QL_VERBOSE.DEFAULT", "QL_VERBOSE.DEBUG", "QL_VERBOSE.DISASM", "QL_VERBOSE.OFF", "QL_VERBOSE.DUMP"], default="QL_VERBOSE.DEFAULT")
     parser.add_argument("-s", "--sanitize", help="Enable memory sanitizer", choices=sanitizers.get_available_sanitizers().keys(), nargs='+')
@@ -55,6 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--end", help="End address for emulation", type=auto_int)
     parser.add_argument("-t", "--timeout", help="Emulation timeout in ms", type=int, default=60*100000)
     parser.add_argument("-f", "--fault-handler", help="What to do when encountering a fault?", choices=['crash', 'stop', 'ignore', 'break'])
+    parser.add_argument("-x", "--extra-modules", help="Extra modules to load", nargs='+')
 
     subparsers = parser.add_subparsers(help="Fuzzing modes", dest="mode")
     nvram_subparsers = subparsers.add_parser("nvram")

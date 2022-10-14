@@ -28,12 +28,13 @@ def start_afl(_ql: Qiling, user_data):
         return crash
 
     try:
-        if not uc_afl_fuzz(_ql.uc,
+        ret = uc_afl_fuzz(_ql.uc,
                             input_file=infile,
                             place_input_callback=place_input_callback,
                             exits=[_ql.os.exit_point],
                             always_validate=True,
-                            validate_crash_callback=validate_crash):
+                            validate_crash_callback=validate_crash)
+        if not ret or ret == UC_AFL_RET_NO_AFL:
                                 print("Dry run completed successfully without AFL attached.")
                                 os._exit(0)  # that's a looot faster than tidying up.
     except unicornafl.UcAflError as ex:
