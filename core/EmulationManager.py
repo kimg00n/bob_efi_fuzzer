@@ -7,7 +7,7 @@ from . import callbacks
 
 class EmulationManager:
 
-    DEFAULT_SANITIZERS = ['memory']
+    DEFAULT_SANITIZERS = ['memory', 'smm_callout']
 
     def __init__(self, target_module, extra_modules=None):
 
@@ -16,8 +16,11 @@ class EmulationManager:
         
         self.ql = Qiling(extra_modules + [target_module], '.', verbose=QL_VERBOSE.DEFAULT)
 
+        callbacks.init_callbacks(self.ql)
+
         self.sanitizers = EmulationManager.DEFAULT_SANITIZERS
         self.fault_handler = 'exit'
+        self.ql.debugger = False
 
     def load_nvram(self, nvram_file):
         with open(nvram_file, 'rb') as nvram:

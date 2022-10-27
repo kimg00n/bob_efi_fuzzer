@@ -1,6 +1,6 @@
 import capstone
 
-def after_module_execution_callback(ql, number_of_modules_left):
+def after_module_execution_callback(ql, number_of_modules_left: int) -> bool:
     ret = False
     for callback in ql.os.after_module_execution_callbacks:
         if callback(ql, number_of_modules_left):
