@@ -35,5 +35,5 @@ def install(ql, in_smm=False):
         ql.os.smm.swsmi_handlers[:] = [tup for tup in ql.os.smm.swsmi_handlers if tup[0] != dh]
         return EFI_SUCCESS
 
-    ql.set_api("mm_interrupt_register", hook_mm_interrupt_register)
-    ql.set_api("efi_mm_interrupt_unregister", hook_efi_mm_interrupt_unregister)
+    ql.os.set_api("mm_interrupt_register", hook_mm_interrupt_register)
+    ql.os.set_api("efi_mm_interrupt_unregister", hook_efi_mm_interrupt_unregister)

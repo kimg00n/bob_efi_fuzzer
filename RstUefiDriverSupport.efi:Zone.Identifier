@@ -1,0 +1,3 @@
+[ZoneTransfer]
+ZoneId=3
+HostUrl=https://s3.us-west-2.amazonaws.com/secure.notion-static.com/9f60f8fc-f26e-41a1-befa-91d0628a432b/RstUefiDriverSupport.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAT73L2G45EIPT3X45%2F20221115%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20221115T012135Z&X-Amz-Expires=86400&X-Amz-Signature=e99595083ce3c86f1f16a19138a09fb7a9da06c0a14500ce54d07169ea040ef0&X-Amz-SignedHeaders=host&response-content-disposition=filename%3D%22RstUefiDriverSupport.txt%22&x-id=GetObject

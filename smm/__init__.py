@@ -2,7 +2,7 @@ from . import protocols
 from qiling.os.uefi.utils import write_int64
 from qiling.os.uefi.ProcessorBind import STRUCT, UINTN
 from qiling.os.memory import QlMemoryHeap
-#from .swsmi import trigger_swsmi
+from .swsmi import trigger_swsmi
 
 class SmmSegment:
     def __init__(self, ql, name):
@@ -39,4 +39,58 @@ class SmmState(object):
         self.smbase = int(ql.os.profile.get("smm", "smbase"), 0)
         self.swsmi_args = {}
 
+        # init CSEG and TSEG
+        self.cseg = SmmSegment(ql, "cseg")
+        self.tseg = SmmSegment(ql, "tseg")
+
+        self.context_buffer =  self.heap_alloc(self.PAGE_SIZE)
+
+        self.comm_buffer = self.heap_alloc(self.PAGE_SIZE)
+    
+    def heap_alloc(self, size):
+        p = self.tseg.heap_alloc(size)
+        if p != 0:
+            return p
         
+        p = self.cseg.heap_alloc(size)
+        return p
+
+    def overlaps(self, address):
+        if self.tseg.overlaps(address):
+            # address overlaps with TSEG
+            return True
+
+        if self.cseg.overlaps(address):
+            # address overlaps with CSEG
+            return True
+
+        # address doesn't overlap SMRAM. 
+        return False
+
+def init(ql, in_smm=False):
+    ql.os.smm = SmmState(ql)
+    protocols.install(ql)
+
+    def hook_InSmm(ql, address, params):
+        nonlocal in_smm
+        write_int64(ql, params["InSmram"], in_smm)
+    # Replace 'InSmm' to correctly report whether or not we're executing an SMM module.
+    ql.os.set_api("InSmm", hook_InSmm)
+    ql.os.smm_ready_to_lock_installed = False
+    def after_module_execution_callback(ql, number_of_modules_left):
+        if number_of_modules_left == 0:
+            if not ql.os.smm_ready_to_lock_installed:
+                ql.os.smm_ready_to_lock_installed = True
+                class SMM_READY_TO_LOCK_PROTOCOL(STRUCT):
+                    _fields_ = [
+                        ('Header', UINTN),
+                    ]
+                descriptor = {
+                    "guid" : "47b7fa8c-f4bd-4af6-8200-333086f0d2c8",
+                    "struct" : SMM_READY_TO_LOCK_PROTOCOL,
+                    "fields" : (('Header', None),)
+                }
+                return ql.loader.smm_context.install_protocol(descriptor, 1)
+            return trigger_swsmi(ql)
+        return False
+    ql.os.after_module_execution_callbacks.append(after_module_execution_callback)

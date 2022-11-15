@@ -3,6 +3,7 @@
 - EFI NVRAM Fuzzer by Best of the Best 11th.
 - Improved qiling and AFL++ version NVRAM fuzzing in [efi_fuzz](https://github.com/Sentinel-One/efi_fuzz) from Sentinel-One
 - It is compatible with the latest version of [qiling](https://github.com/qilingframework/qiling) & [AFL++](https://github.com/AFLplusplus/AFLplusplus)(qiling=1.4.4, AFL++=4.03c)
+- You have to install triton if you want use tainter
 
 ## Install AFL++ & unicornafl
   - install AFL++

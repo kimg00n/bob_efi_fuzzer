@@ -5,6 +5,7 @@ from unicorn import *
 from core.EmulationManager import EmulationManager
 from core.FuzzingManager import FuzzingManager
 import sanitizers
+import taint.tracker
 
 auto_int = functools.partial(int, base=0)
 
@@ -20,7 +21,7 @@ def create_emulator(cls, args):
         emu.fault_handler = args.fault_handler
 
     # Initialize SMRAM and some SMM-related protocols.
-    #emu.enable_smm()
+    emu.enable_smm()
 
     # Enable sanitizers.
     if args.sanitize:

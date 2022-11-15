@@ -28,5 +28,5 @@ def hook_SMM_CPU_WriteSaveState(ql, address, params):
 
 
 def init_EFI_SMM_CPU_PROTOCOL(ql):
-    ql.set_api("SmmReadSaveState", hook_SMM_CPU_ReadSaveState)
-    ql.set_api("SmmWriteSaveState", hook_SMM_CPU_WriteSaveState)
+    ql.os.set_api("SmmReadSaveState", hook_SMM_CPU_ReadSaveState)
+    ql.os.set_api("SmmWriteSaveState", hook_SMM_CPU_WriteSaveState)

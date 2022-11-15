@@ -4,6 +4,8 @@ from qiling.const import QL_VERBOSE
 from . import fault
 import sanitizers
 from . import callbacks
+import os
+import smm
 
 class EmulationManager:
 
@@ -31,6 +33,11 @@ class EmulationManager:
         for sanitizer in self.sanitizers:
             sanitizers.get(sanitizer)(self.ql).enable()
     
+    def enable_smm(self):
+        profile = os.path.join(os.path.dirname(__file__), os.path.pardir, 'smm', 'smm.ini')
+        self.ql.profile.read(profile)
+        smm.init(self.ql, True)
+
     @property
     def fault_handler(self):
         return self._fault_handler
